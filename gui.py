@@ -3,6 +3,77 @@ from tkinter import ttk, messagebox, filedialog
 from operations import validate_date, Tasks_Manager
 import datetime
 
+class TaskInputDialog:
+    def __init__(self, parent):
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("Add New Task")
+        self.dialog.geometry("300x200")
+        self.dialog.resizable(False, False)
+        self.dialog.transient(parent)
+        
+        # Center the dialog
+        self.dialog.geometry("+%d+%d" % (
+            parent.winfo_rootx() + 50,
+            parent.winfo_rooty() + 50))
+        
+        # Form fields
+        self.create_widgets()
+        
+        # Make dialog modal
+        self.dialog.grab_set()
+        self.result = None
+
+    def create_widgets(self):
+        # Title
+        title_frame = ttk.Frame(self.dialog, padding="5")
+        title_frame.pack(fill=tk.X, padx=5, pady=2)
+        ttk.Label(title_frame, text="Title:").pack(side=tk.LEFT)
+        self.title_var = tk.StringVar()
+        ttk.Entry(title_frame, textvariable=self.title_var, width=30).pack(side=tk.LEFT, padx=5)
+
+        # Category
+        cat_frame = ttk.Frame(self.dialog, padding="5")
+        cat_frame.pack(fill=tk.X, padx=5, pady=2)
+        ttk.Label(cat_frame, text="Category:").pack(side=tk.LEFT)
+        self.category_var = tk.StringVar()
+        ttk.Entry(cat_frame, textvariable=self.category_var, width=30).pack(side=tk.LEFT, padx=5)
+
+        # Due Date
+        date_frame = ttk.Frame(self.dialog, padding="5")
+        date_frame.pack(fill=tk.X, padx=5, pady=2)
+        ttk.Label(date_frame, text="Due Date:").pack(side=tk.LEFT)
+        self.date_var = tk.StringVar(value="YYYY-MM-DD")
+        ttk.Entry(date_frame, textvariable=self.date_var, width=30).pack(side=tk.LEFT, padx=5)
+
+        # Buttons
+        btn_frame = ttk.Frame(self.dialog, padding="10")
+        btn_frame.pack(fill=tk.X, pady=10)
+        ttk.Button(btn_frame, text="Add", command=self.on_add).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Cancel", command=self.on_cancel).pack(side=tk.RIGHT, padx=5)
+
+    def on_add(self):
+        title = self.title_var.get().strip()
+        category = self.category_var.get().strip()
+        due_date = self.date_var.get().strip()
+
+        if not all([title, category, due_date]):
+            messagebox.showerror("Error", "All fields are required!", parent=self.dialog)
+            return
+
+        if not validate_date(due_date):
+            messagebox.showerror("Error", "Invalid date format! Use YYYY-MM-DD", parent=self.dialog)
+            return
+
+        self.result = {
+            "title": title,
+            "category": category,
+            "due_date": due_date
+        }
+        self.dialog.destroy()
+
+    def on_cancel(self):
+        self.dialog.destroy()
+
 class TaskManagerGUI:
     def __init__(self, root):
         self.root = root
@@ -15,23 +86,6 @@ class TaskManagerGUI:
         self.main_frame = ttk.Frame(root, padding="10")
         self.main_frame.grid(row=0, column=0, sticky=tk.W+tk.E+tk.N+tk.S)
         
-        # Task input fields
-        ttk.Label(self.main_frame, text="Title:").grid(row=0, column=0, sticky=tk.W)
-        self.title_var = tk.StringVar()
-        self.title_entry = ttk.Entry(self.main_frame, textvariable=self.title_var, width=40)
-        self.title_entry.grid(row=0, column=1, columnspan=2, pady=5)
-        
-        ttk.Label(self.main_frame, text="Category:").grid(row=1, column=0, sticky=tk.W)
-        self.category_var = tk.StringVar()
-        self.category_entry = ttk.Entry(self.main_frame, textvariable=self.category_var, width=40)
-        self.category_entry.grid(row=1, column=1, columnspan=2, pady=5)
-        
-        ttk.Label(self.main_frame, text="Due Date:").grid(row=2, column=0, sticky=tk.W)
-        self.date_var = tk.StringVar()
-        self.date_entry = ttk.Entry(self.main_frame, textvariable=self.date_var, width=40)
-        self.date_entry.grid(row=2, column=1, columnspan=2, pady=5)
-        self.date_entry.insert(0, "YYYY-MM-DD")
-        
         # Buttons
         ttk.Button(self.main_frame, text="Add Task", command=self.add_task).grid(row=3, column=0, pady=10)
         ttk.Button(self.main_frame, text="Mark Complete", command=self.mark_completed).grid(row=3, column=1, pady=10)
@@ -40,6 +94,7 @@ class TaskManagerGUI:
         
         # Filter options
         self.filter_var = tk.StringVar(value="all")
+        self.category_var = tk.StringVar()
         ttk.Radiobutton(self.main_frame, text="All", variable=self.filter_var, 
                        value="all", command=self.update_task_list).grid(row=4, column=0)
         ttk.Radiobutton(self.main_frame, text="By Category", variable=self.filter_var,
@@ -65,28 +120,18 @@ class TaskManagerGUI:
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
     
     def add_task(self):
-        title = self.title_var.get().strip()
-        category = self.category_var.get().strip()
-        due_date = self.date_var.get().strip()
+        dialog = TaskInputDialog(self.root)
+        self.root.wait_window(dialog.dialog)
         
-        if not all([title, category, due_date]):
-            messagebox.showerror("Error", "All fields are required!")
-            return
-            
-        if not self.validate_date(due_date):
-            messagebox.showerror("Error", "Invalid date format! Use YYYY-MM-DD")
-            return
-            
-        self.manager.tasks.append({
-            "title": title,
-            "category": category,
-            "due_date": due_date,
-            "completed": False
-        })
-        
-        self.clear_inputs()
-        self.update_task_list()
-        messagebox.showinfo("Success", f"Task '{title}' added successfully!")
+        if dialog.result:
+            self.manager.tasks.append({
+                "title": dialog.result["title"],
+                "category": dialog.result["category"],
+                "due_date": dialog.result["due_date"],
+                "completed": False
+            })
+            self.update_task_list()
+            messagebox.showinfo("Success", f"Task '{dialog.result['title']}' added successfully!")
     
     def mark_completed(self):
         selection = self.task_list.selection()
@@ -130,11 +175,6 @@ class TaskManagerGUI:
                 status
             ))
     
-    def clear_inputs(self):
-        self.title_var.set("")
-        self.category_var.set("")
-        self.date_entry.delete(0, tk.END)
-        self.date_entry.insert(0, "YYYY-MM-DD")
     
     def on_closing(self):
         if messagebox.askokcancel("Quit", "Do you want to save before quitting?"):
